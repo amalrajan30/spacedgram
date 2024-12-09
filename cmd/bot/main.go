@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/amalrajan30/spacedgram/highlights"
 	"github.com/amalrajan30/spacedgram/internal/bot"
 	"github.com/joho/godotenv"
 
@@ -62,7 +63,8 @@ func main() {
 	}
 
 	log.Printf("%s has been started...\n", b.User.Username)
-
 	// Idle, to keep updates coming in, and avoid bot stopping.
-	updater.Idle()
+	defer updater.Idle()
+
+	defer highlights.UploadHandler()
 }
