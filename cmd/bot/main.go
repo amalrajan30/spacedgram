@@ -68,6 +68,7 @@ func main() {
 	updater := ext.NewUpdater(dispatcher, nil)
 
 	dispatcher.AddHandler(handlers.NewCommand("list_topics", botHandler.ListTopics))
+	dispatcher.AddHandler(handlers.NewCommand("sync", botHandler.SyncNotes))
 
 	err = updater.StartPolling(b, &ext.PollingOpts{
 		DropPendingUpdates: true,

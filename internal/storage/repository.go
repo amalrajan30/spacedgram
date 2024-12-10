@@ -101,11 +101,24 @@ func (repo Repository) BulkInsertHighlights(toInsert []highlights.Highlight) {
 		}
 	}
 
+	log.Printf("%v new highlights found \n", len(highlightsToInsert))
+
 	if len(highlightsToInsert) > 0 {
 		repo.insertHighlight(highlightsToInsert)
 	}
 }
 
-func (repo Repository) GetSources() {
+func (repo Repository) GetSources() []string {
 
+	var sources []Source
+
+	titles := make([]string, 0)
+
+	repo.db.Find(&sources)
+
+	for _, source := range sources {
+		titles = append(titles, source.Title)
+	}
+
+	return titles
 }
