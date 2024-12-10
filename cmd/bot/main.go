@@ -6,9 +6,12 @@ import (
 	"os"
 	"time"
 
-	"github.com/amalrajan30/spacedgram/highlights"
 	"github.com/amalrajan30/spacedgram/internal/bot"
+	"github.com/amalrajan30/spacedgram/internal/highlights"
+	"github.com/amalrajan30/spacedgram/internal/storage"
 	"github.com/joho/godotenv"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -19,9 +22,22 @@ func main() {
 	envErr := godotenv.Load()
 
 	if envErr != nil {
-		log.Fatal("loading env file failed")
+		log.Fatalf("loading env file failed: %v", envErr)
 	}
 
+	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		os.Getenv("DB_HOST"),
+		os.Getenv("DB_PORT"),
+		os.Getenv("DB_USER"),
+		os.Getenv("DB_PASSWORD"),
+		os.Getenv("DB_NAME"),
+	)
+
+	db, err := gorm.Open(postgres.Open(dsn))
+
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
 
 	fmt.Println("Hello, World!")
 	token := os.Getenv("BOT_TOKEN")
@@ -36,6 +52,11 @@ func main() {
 		panic("Failed to create new bot: " + err.Error())
 	}
 
+	repository := storage.NewRepository(db)
+	botService := bot.NewBotService(repository)
+
+	botHandler := bot.NewBotHandler(botService)
+
 	dispatcher := ext.NewDispatcher(&ext.DispatcherOpts{
 		Error: func(b *gotgbot.Bot, ctx *ext.Context, err error) ext.DispatcherAction {
 			log.Println("Error occurred while handling update:", err.Error())
@@ -46,7 +67,7 @@ func main() {
 
 	updater := ext.NewUpdater(dispatcher, nil)
 
-	dispatcher.AddHandler(handlers.NewCommand("list_topics", bot.ListTopics))
+	dispatcher.AddHandler(handlers.NewCommand("list_topics", botHandler.ListTopics))
 
 	err = updater.StartPolling(b, &ext.PollingOpts{
 		DropPendingUpdates: true,

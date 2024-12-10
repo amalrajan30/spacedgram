@@ -7,9 +7,21 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
-func ListTopics(b *gotgbot.Bot, ctx *ext.Context) error {
+type BotHandler struct {
+	service *BotService
+}
+
+func NewBotHandler(service *BotService) *BotHandler {
+	return &BotHandler{
+		service: service,
+	}
+}
+
+func (handler BotHandler) ListTopics(b *gotgbot.Bot, ctx *ext.Context) error {
 
 	fmt.Println("Got list all topic")
+
+	handler.service.SyncHighlights()
 
 	_, err := ctx.EffectiveMessage.Reply(b, "Hallo, this is in work!!!", &gotgbot.SendMessageOpts{
 		ParseMode: "HTML",
