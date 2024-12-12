@@ -16,6 +16,7 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/callbackquery"
 )
 
 func main() {
@@ -69,6 +70,8 @@ func main() {
 
 	dispatcher.AddHandler(handlers.NewCommand("list_topics", botHandler.ListTopics))
 	dispatcher.AddHandler(handlers.NewCommand("sync", botHandler.SyncNotes))
+	dispatcher.AddHandler(handlers.NewCommand("startreview", botHandler.StartReviewing))
+	dispatcher.AddHandler(handlers.NewCallback(callbackquery.All, botHandler.HandleCallback))
 
 	err = updater.StartPolling(b, &ext.PollingOpts{
 		DropPendingUpdates: true,

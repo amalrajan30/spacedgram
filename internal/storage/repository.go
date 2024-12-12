@@ -108,17 +108,33 @@ func (repo Repository) BulkInsertHighlights(toInsert []highlights.Highlight) {
 	}
 }
 
-func (repo Repository) GetSources() []string {
+type title struct {
+	Id   int
+	Name string
+}
+
+func (repo Repository) GetSources() []title {
+
+	titles := []title{}
 
 	var sources []Source
-
-	titles := make([]string, 0)
 
 	repo.db.Find(&sources)
 
 	for _, source := range sources {
-		titles = append(titles, source.Title)
+		titles = append(titles, title{
+			Id:   int(source.ID),
+			Name: source.Title,
+		})
 	}
 
 	return titles
+}
+
+func (repo Repository) GetSource(id int) Source {
+	var source Source
+
+	repo.db.Where("id = ?", id).First(&source)
+
+	return source
 }
