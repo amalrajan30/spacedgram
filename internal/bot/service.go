@@ -157,3 +157,8 @@ func (service BotService) HandleReviewResponse(callbackData string) {
 
 	log.Println("Note updated")
 }
+
+func (service BotService) HandleReset(source int) {
+
+	service.repo.ResetSource(source)
+}

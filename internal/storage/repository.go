@@ -194,3 +194,14 @@ func (repo Repository) UpdateNote(id int, update Note) {
 
 	repo.db.Debug().Model(&note).Where("id = ?", id).Updates(update)
 }
+
+func (repo Repository) ResetSource(id int) {
+
+	repo.db.Debug().Model(&Note{}).Where("source_id = ?", id).Updates(map[string]interface{}{
+		"next_due_date":   nil,
+		"last_reviewed":   nil,
+		"interval":        0,
+		"easiness_factor": nil,
+		"review_count":    0,
+	})
+}

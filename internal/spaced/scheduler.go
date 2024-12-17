@@ -13,18 +13,18 @@ type Scheduler struct {
 func (s *Scheduler) Run() {
 	for _, note := range s.notes {
 		if time.Now().After(note.nextDueDate) {
-			s.reviewNote(note)
+			// s.reviewNote(note)
 		}
 	}
 }
 
-func (s *Scheduler) reviewNote(note *Note) {
-	reviewQuality := s.getReviewQuality()
-	nextDueDate := GetNextDueDate(note, reviewQuality)
+// func (s *Scheduler) reviewNote(note *Note) {
+// 	reviewQuality := s.getReviewQuality()
+// 	nextDueDate := GetNextDueDate(note, reviewQuality)
 
-	note.nextDueDate = nextDueDate
-	note.lastReviewed = time.Now()
-}
+// 	note.nextDueDate = nextDueDate
+// 	note.lastReviewed = time.Now()
+// }
 
 func (s *Scheduler) getReviewQuality() int {
 	fmt.Println("Getting review quality")

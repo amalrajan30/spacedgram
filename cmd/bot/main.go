@@ -70,6 +70,7 @@ func main() {
 	dispatcher.AddHandler(handlers.NewCommand("list_topics", botHandler.ListTopics))
 	dispatcher.AddHandler(handlers.NewCommand("sync", botHandler.SyncNotes))
 	dispatcher.AddHandler(handlers.NewCommand("startreview", botHandler.StartReviewing))
+	dispatcher.AddHandler(handlers.NewCallback(callbackquery.Equal("reset"), botHandler.HandleReviewReset))
 	dispatcher.AddHandler(handlers.NewCallback(callbackquery.Equal("start_review"), botHandler.HandleStartReview))
 	dispatcher.AddHandler(handlers.NewCallback(callbackquery.Prefix("review"), botHandler.HandleReviews))
 	dispatcher.AddHandler(handlers.NewCallback(callbackquery.All, botHandler.HandleCallback))

@@ -324,3 +324,35 @@ func (handler *BotHandler) HandleReviews(b *gotgbot.Bot, ctx *ext.Context) error
 
 	return nil
 }
+
+func (handler *BotHandler) HandleReviewReset(b *gotgbot.Bot, ctx *ext.Context) error {
+	cb := ctx.Update.CallbackQuery
+
+	_, err := cb.Answer(b, &gotgbot.AnswerCallbackQueryOpts{
+		Text: "Processing",
+	})
+
+	if err != nil {
+		return fmt.Errorf("Failed to answer callback query: %v", err)
+	}
+
+	source_id, not_found := handler.getUserData("source_id")
+	if not_found {
+		_, _, err := cb.Message.EditText(b, "Got invalid response", nil)
+
+		if err != nil {
+			return fmt.Errorf("failed to answer callback query: %v", err)
+		}
+	}
+
+	handler.service.HandleReset(source_id)
+
+	_, _, msgErr := cb.Message.EditText(b, "Review progress rested",
+		&gotgbot.EditMessageTextOpts{
+			ParseMode: "HTML",
+		})
+	if msgErr != nil {
+		return fmt.Errorf("failed to edit message: %w", msgErr)
+	}
+	return nil
+}
