@@ -7,10 +7,12 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/amalrajan30/spacedgram/internal/highlights"
+	"github.com/amalrajan30/spacedgram/internal/spaced"
 	"github.com/amalrajan30/spacedgram/internal/storage"
 )
 
@@ -120,4 +122,38 @@ func (service BotService) SyncHighlights() {
 
 	service.repo.BulkInsertHighlights(items)
 
+}
+
+func (service BotService) HandleReviewResponse(callbackData string) {
+	noteId, err := strconv.Atoi(strings.Split(callbackData, "_")[1])
+	rating, err := strconv.Atoi(strings.Split(callbackData, "_")[2])
+
+	if err != nil {
+		log.Printf("Failed to parse data while handling review response: %v", err)
+
+		return
+	}
+
+	log.Printf("Got note: %v from review response with rating: %v", noteId, rating)
+
+	note, err := service.repo.GetNote(noteId)
+
+	if err != nil {
+		log.Printf("Failed to get note: %v", err)
+		return
+	}
+
+	nextDue, interval, easiness := spaced.GetNextDueDate(*note, rating)
+
+	now := time.Now()
+
+	service.repo.UpdateNote(noteId, storage.Note{
+		NextDueDate:    &nextDue,
+		Interval:       interval,
+		EasinessFactor: &easiness,
+		LastReviewed:   &now,
+		ReviewCount:    note.ReviewCount + 1,
+	})
+
+	log.Println("Note updated")
 }

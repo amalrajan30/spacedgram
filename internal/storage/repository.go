@@ -2,6 +2,7 @@ package storage
 
 import (
 	"errors"
+	"fmt"
 	"log"
 
 	"github.com/amalrajan30/spacedgram/internal/highlights"
@@ -137,4 +138,59 @@ func (repo Repository) GetSource(id int) Source {
 	repo.db.Where("id = ?", id).First(&source)
 
 	return source
+}
+
+func (repo Repository) GetNotes(source_id int) []Note {
+	var notes []Note
+
+	repo.db.Joins("JOIN sources ON notes.source_id = sources.id").Where(
+		"sources.id = ?", source_id).Find(&notes)
+
+	return notes
+}
+
+func (repo Repository) GetNextNote(source_id int, skip int) (Note, error) {
+
+	var notes []Note
+
+	result := repo.db.
+		Where("source_id = ?", source_id).
+		Preload("Source").
+		Order("id ASC").
+		Offset(skip).
+		Limit(1).
+		Find(&notes)
+
+	if result.Error != nil || result.RowsAffected == 0 {
+		return Note{}, result.Error
+	}
+
+	return notes[0], nil
+}
+
+func (repo Repository) GetNote(id int) (*Note, error) {
+
+	var note Note
+
+	result := repo.db.Limit(1).
+		Preload("Source").
+		Where("id = ?", id).
+		Find(&note)
+
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to get note: %w", result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return nil, fmt.Errorf("note with id %d not found", id)
+	}
+
+	return &note, nil
+}
+
+func (repo Repository) UpdateNote(id int, update Note) {
+
+	var note Note
+
+	repo.db.Debug().Model(&note).Where("id = ?", id).Updates(update)
 }

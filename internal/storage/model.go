@@ -10,7 +10,7 @@ import (
 type Note struct {
 	gorm.Model
 	Content        string
-	EasinessFactor *float32
+	EasinessFactor *float64
 	NextDueDate    *time.Time `gorm:"index"`
 	LastReviewed   *time.Time
 	Interval       int
