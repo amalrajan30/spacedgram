@@ -48,6 +48,48 @@ func NewBotHandler(service *BotService) *BotHandler {
 	}
 }
 
+func (h *BotHandler) editMessage(b *gotgbot.Bot, msg gotgbot.MaybeInaccessibleMessage, text string, opts *gotgbot.EditMessageTextOpts) error {
+	if opts == nil {
+		opts = &gotgbot.EditMessageTextOpts{
+			ParseMode: "HTML",
+		}
+	}
+	_, _, err := msg.EditText(b, text, opts)
+	if err != nil {
+		return fmt.Errorf("failed to edit message: %w", err)
+	}
+	return nil
+}
+
+type reviewButton struct {
+	Text  string
+	Score int
+}
+
+var reviewButtons = []reviewButton{
+	{Text: "Perfect", Score: 5},
+	{Text: "Some Hesitation", Score: 4},
+	{Text: "With Difficulty", Score: 3},
+	{Text: "Wrong, Recalled", Score: 2},
+	{Text: "Wrong, Remembered when shown", Score: 1},
+	{Text: "Complete Blackout", Score: 0},
+}
+
+func (h *BotHandler) buildReviewKeyboard(noteID int64) gotgbot.InlineKeyboardMarkup {
+	var keyboardRows [][]gotgbot.InlineKeyboardButton
+
+	for _, button := range reviewButtons {
+		keyboardRows = append(keyboardRows, []gotgbot.InlineKeyboardButton{{
+			Text:         button.Text,
+			CallbackData: fmt.Sprintf("review_%v_%v", noteID, button.Score),
+		}})
+	}
+
+	return gotgbot.InlineKeyboardMarkup{
+		InlineKeyboard: keyboardRows,
+	}
+}
+
 func (handler *BotHandler) ListTopics(b *gotgbot.Bot, ctx *ext.Context) error {
 
 	fmt.Println("Got list all topic")
@@ -123,7 +165,7 @@ func (handler *BotHandler) StartReviewing(b *gotgbot.Bot, ctx *ext.Context) erro
 
 }
 
-func (handler *BotHandler) HandleCallback(b *gotgbot.Bot, ctx *ext.Context) error {
+func (h *BotHandler) HandleSelectSourceCallback(b *gotgbot.Bot, ctx *ext.Context) error {
 	bookID := ctx.CallbackQuery.Data
 	cb := ctx.Update.CallbackQuery
 
@@ -132,21 +174,22 @@ func (handler *BotHandler) HandleCallback(b *gotgbot.Bot, ctx *ext.Context) erro
 	})
 
 	if err != nil {
-		return fmt.Errorf("Failed to answer callback query: %v", err)
+		return fmt.Errorf("failed to answer callback query: %w", err)
 	}
 
-	if bookID == "" {
-		_, _, err = cb.Message.EditText(b, "Got invalid response", nil)
-	}
-
-	id, err := strconv.Atoi(bookID)
+	source, err := h.service.SelectSource(bookID)
 
 	if err != nil {
-		_, _, err = cb.Message.EditText(b, "Got invalid response", nil)
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			return h.editMessage(b, cb.Message, "Could not find the specified book", nil)
+		default:
+			log.Printf("Failed to start review: %v", err)
+			return h.editMessage(b, cb.Message, "Failed to start review", nil)
+		}
 	}
 
-	source := handler.service.repo.GetSource(id)
-	handler.setUserData("source_id", id)
+	h.setUserData("source_id", int(source.ID))
 
 	keyboard := gotgbot.InlineKeyboardMarkup{
 		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{{
@@ -161,22 +204,20 @@ func (handler *BotHandler) HandleCallback(b *gotgbot.Bot, ctx *ext.Context) erro
 		}},
 	}
 
-	_, _, err = cb.Message.EditText(b, fmt.Sprintf(
+	if err := h.editMessage(b, cb.Message, fmt.Sprintf(
 		"Selected book: %s\nNo of notes: %v",
 		source.Title, source.TotalNotes,
 	), &gotgbot.EditMessageTextOpts{
 		ReplyMarkup: keyboard,
 		ParseMode:   "HTML",
-	})
-
-	if err != nil {
+	}); err != nil {
 		return fmt.Errorf("failed to edit message: %w", err)
 	}
 
 	return nil
 }
 
-func (handler *BotHandler) HandleStartReview(b *gotgbot.Bot, ctx *ext.Context) error {
+func (h *BotHandler) HandleStartReview(b *gotgbot.Bot, ctx *ext.Context) error {
 	cb := ctx.Update.CallbackQuery
 
 	_, err := cb.Answer(b, &gotgbot.AnswerCallbackQueryOpts{
@@ -187,7 +228,7 @@ func (handler *BotHandler) HandleStartReview(b *gotgbot.Bot, ctx *ext.Context) e
 		return fmt.Errorf("Failed to answer callback query: %v", err)
 	}
 
-	id, not_found := handler.getUserData("source_id")
+	id, not_found := h.getUserData("source_id")
 
 	if not_found {
 		_, _, err = cb.Message.EditText(b, "Got invalid response", nil)
@@ -195,30 +236,33 @@ func (handler *BotHandler) HandleStartReview(b *gotgbot.Bot, ctx *ext.Context) e
 
 	log.Printf("Got book to start review: %v\n", id)
 
-	source := handler.service.repo.GetSource(id)
-
-	_, _, err = cb.Message.EditText(b, fmt.Sprintf(
-		"Starting review for book: %s\nNo of notes: %v",
-		source.Title, source.TotalNotes,
-	), &gotgbot.EditMessageTextOpts{
-		ParseMode: "HTML",
-	})
-
-	notesToReview := handler.service.repo.GetNotes(int(source.ID))
-
-	handler.setUserData("notes_count", len(notesToReview))
-	handler.setUserData("skip", 0)
-
-	handler.HandleReviews(b, ctx)
-
+	session, err := h.service.StartSourceReview(id)
 	if err != nil {
-		return fmt.Errorf("failed to edit message: %w", err)
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			return h.editMessage(b, cb.Message, "Could not find the specified book", nil)
+		default:
+			log.Printf("Failed to start review: %v", err)
+			return h.editMessage(b, cb.Message, "Failed to start review", nil)
+		}
 	}
+
+	if err := h.editMessage(b, cb.Message, fmt.Sprintf(
+		"Starting review for book: %s\nNo of notes: %v",
+		session.Source.Title, session.Source.TotalNotes,
+	), nil); err != nil {
+		return fmt.Errorf("editing message: %w", err)
+	}
+
+	h.setUserData("notes_count", session.Count)
+	h.setUserData("skip", 0)
+
+	h.HandleReviews(b, ctx)
 
 	return nil
 }
 
-func (handler *BotHandler) HandleReviews(b *gotgbot.Bot, ctx *ext.Context) error {
+func (h *BotHandler) HandleReviews(b *gotgbot.Bot, ctx *ext.Context) error {
 	cb := ctx.Update.CallbackQuery
 	data := ctx.CallbackQuery.Data
 
@@ -230,97 +274,54 @@ func (handler *BotHandler) HandleReviews(b *gotgbot.Bot, ctx *ext.Context) error
 		return fmt.Errorf("Failed to answer callback query: %v", err)
 	}
 
-	if data != "start_review" {
-		handler.service.HandleReviewResponse(data)
+	sourceID, sourceNotFound := h.getUserData("source_id")
+	skip, skipNotFound := h.getUserData("skip")
+	// notes_count, not_found := h.getUserData("notes_count")
+
+	if !sourceNotFound || !skipNotFound {
+		log.Printf("Not found hit: %v, %v", sourceID, skip)
+		return h.editMessage(b, cb.Message, "Got invalid response", nil)
 	}
 
-	source_id, not_found := handler.getUserData("source_id")
-	skip, not_found := handler.getUserData("skip")
-	notes_count, not_found := handler.getUserData("notes_count")
+	// if skip >= notes_count {
+	// 	log.Printf("Review completed for: %v", sourceID)
+	// 	_, _, msgErr := cb.Message.EditText(b, "Review complete",
+	// 		&gotgbot.EditMessageTextOpts{
+	// 			ParseMode: "HTML",
+	// 		})
+	// 	if msgErr != nil {
+	// 		return fmt.Errorf("failed to edit message: %w", err)
+	// 	}
+	// 	return nil
+	// }
 
-	if not_found {
-		_, _, err := cb.Message.EditText(b, "Got invalid response", nil)
-
-		if err != nil {
-			return fmt.Errorf("failed to answer callback query: %v", err)
-		}
-	}
-
-	if skip >= notes_count {
-		log.Printf("Review completed for: %v", source_id)
-		_, _, msgErr := cb.Message.EditText(b, "Review complete",
-			&gotgbot.EditMessageTextOpts{
-				ParseMode: "HTML",
-			})
-		if msgErr != nil {
-			return fmt.Errorf("failed to edit message: %w", err)
-		}
-		return nil
-	}
-
-	noteToReview, err := handler.service.repo.GetNextNote(source_id, skip)
+	state, err := h.service.ProcessReview(sourceID, skip, data)
 
 	if err != nil {
-		msg := "Something went wrong"
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			log.Printf("no more notes found for source %d", source_id)
-		} else {
-			log.Printf("Something went wrong while getting next note for review: %v", err)
-		}
-		_, _, msgErr := cb.Message.EditText(b, msg,
-			&gotgbot.EditMessageTextOpts{
-				ParseMode: "HTML",
-			})
-		if msgErr != nil {
-			return fmt.Errorf("failed to edit message: %w", err)
-		}
-		return nil
+		log.Printf("Error processing review: %v", err)
+		return h.editMessage(b, cb.Message, "Something went wrong while processing review", nil)
 	}
 
-	log.Printf("Got note to review: %v", noteToReview)
-
-	keyboard := gotgbot.InlineKeyboardMarkup{
-		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
-			{{
-				Text:         "Prefect",
-				CallbackData: fmt.Sprintf("review_%v_%v", noteToReview.ID, 5),
-			}},
-			{{
-				Text:         "Some Hesitation",
-				CallbackData: fmt.Sprintf("review_%v_%v", noteToReview.ID, 4),
-			}},
-			{{
-				Text:         "With Difficulty",
-				CallbackData: fmt.Sprintf("review_%v_%v", noteToReview.ID, 3),
-			}},
-			{{
-				Text:         "Wrong, Recalled",
-				CallbackData: fmt.Sprintf("review_%v_%v", noteToReview.ID, 2),
-			}},
-			{{
-				Text:         "Wrong, Remembered when shown",
-				CallbackData: fmt.Sprintf("review_%v_%v", noteToReview.ID, 1),
-			}},
-			{{
-				Text:         "Complete Blackout",
-				CallbackData: fmt.Sprintf("review_%v_%v", noteToReview.ID, 0),
-			}},
-		},
+	if state.IsComplete {
+		log.Printf("Review completed for: %v", sourceID)
+		return h.editMessage(b, cb.Message, "Review complete", nil)
 	}
 
-	_, _, err = cb.Message.EditText(b, fmt.Sprintf(
+	keyboard := h.buildReviewKeyboard(int64(state.NoteToReview.ID))
+	noteText := fmt.Sprintf(
 		"<b>%s</b> \n\n<i>%v</i>\n",
-		noteToReview.Content, noteToReview.Source.Title,
-	), &gotgbot.EditMessageTextOpts{
+		state.NoteToReview.Content, state.NoteToReview.Source.Title,
+	)
+
+	if keyboardErr := h.editMessage(b, cb.Message, noteText, &gotgbot.EditMessageTextOpts{
 		ReplyMarkup: keyboard,
 		ParseMode:   "HTML",
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to edit message: %w", err)
+	}); keyboardErr != nil {
+		log.Printf("Error while sending review keyboard: %v", keyboardErr)
+		return fmt.Errorf("editing message with note: %w", keyboardErr)
 	}
 
-	handler.setUserData("skip", skip+1)
+	h.setUserData("skip", skip+1)
 
 	return nil
 }

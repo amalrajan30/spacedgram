@@ -73,7 +73,7 @@ func main() {
 	dispatcher.AddHandler(handlers.NewCallback(callbackquery.Equal("reset"), botHandler.HandleReviewReset))
 	dispatcher.AddHandler(handlers.NewCallback(callbackquery.Equal("start_review"), botHandler.HandleStartReview))
 	dispatcher.AddHandler(handlers.NewCallback(callbackquery.Prefix("review"), botHandler.HandleReviews))
-	dispatcher.AddHandler(handlers.NewCallback(callbackquery.All, botHandler.HandleCallback))
+	dispatcher.AddHandler(handlers.NewCallback(callbackquery.All, botHandler.HandleSelectSourceCallback))
 
 	err = updater.StartPolling(b, &ext.PollingOpts{
 		DropPendingUpdates: true,

@@ -2,6 +2,7 @@ package bot
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -124,14 +125,96 @@ func (service BotService) SyncHighlights() {
 
 }
 
-func (service BotService) HandleReviewResponse(callbackData string) {
+func (s BotService) SelectSource(callbackData string) (storage.Source, error) {
+	if callbackData == "" {
+		return storage.Source{}, fmt.Errorf("No callback data found")
+	}
+
+	id, err := strconv.Atoi(callbackData)
+
+	if err != nil {
+		return storage.Source{}, fmt.Errorf("failed to convert callback id to int")
+	}
+
+	source, err := s.repo.GetSource(id)
+
+	if err != nil {
+		return storage.Source{}, err
+	}
+
+	return source, nil
+}
+
+type ReviewSession struct {
+	Source storage.Source
+	Count  int
+}
+
+func (s BotService) StartSourceReview(sourceID int) (*ReviewSession, error) {
+	source, err := s.repo.GetSource(sourceID)
+
+	if err != nil {
+		return nil, fmt.Errorf("getting source: %w", err)
+	}
+
+	notes, err := s.repo.GetNotes(int(source.ID))
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve notes for source ID %v", sourceID)
+	}
+
+	if len(notes) == 0 {
+		return nil, fmt.Errorf("no notes available for review in source ID %v", sourceID)
+	}
+
+	return &ReviewSession{
+		Source: source,
+		Count:  len(notes),
+	}, nil
+
+}
+
+type ReviewState struct {
+	NoteToReview *storage.Note
+	IsComplete   bool
+	CurrentCount int
+	TotalCount   int
+}
+
+func (s BotService) ProcessReview(sourceID int, skip int, previousResponse string) (*ReviewState, error) {
+
+	if previousResponse != "start_review" {
+		if err := s.HandleReviewResponse(previousResponse); err != nil {
+			return nil, fmt.Errorf("handling review response: %w", err)
+		}
+	}
+
+	note, err := s.repo.GetNextNote(sourceID, skip)
+	if err != nil {
+		if errors.Is(err, storage.ErrNoNextNote) {
+			return &ReviewState{
+				IsComplete:   true,
+				CurrentCount: skip,
+				TotalCount:   skip,
+			}, nil
+		}
+		return nil, fmt.Errorf("getting next note: %w", err)
+	}
+
+	return &ReviewState{
+		NoteToReview: &note,
+		IsComplete:   false,
+		CurrentCount: skip,
+		TotalCount:   skip + 1,
+	}, nil
+}
+
+func (service BotService) HandleReviewResponse(callbackData string) error {
 	noteId, err := strconv.Atoi(strings.Split(callbackData, "_")[1])
 	rating, err := strconv.Atoi(strings.Split(callbackData, "_")[2])
 
 	if err != nil {
-		log.Printf("Failed to parse data while handling review response: %v", err)
-
-		return
+		fmt.Errorf("Failed to parse data while handling review response: %w", err)
 	}
 
 	log.Printf("Got note: %v from review response with rating: %v", noteId, rating)
@@ -139,8 +222,8 @@ func (service BotService) HandleReviewResponse(callbackData string) {
 	note, err := service.repo.GetNote(noteId)
 
 	if err != nil {
-		log.Printf("Failed to get note: %v", err)
-		return
+		return fmt.Errorf("Failed to get note: %w", err)
+
 	}
 
 	nextDue, interval, easiness := spaced.GetNextDueDate(*note, rating)
@@ -156,6 +239,8 @@ func (service BotService) HandleReviewResponse(callbackData string) {
 	})
 
 	log.Println("Note updated")
+
+	return nil
 }
 
 func (service BotService) HandleReset(source int) {

@@ -132,22 +132,37 @@ func (repo Repository) GetSources() []title {
 	return titles
 }
 
-func (repo Repository) GetSource(id int) Source {
+func (repo Repository) GetSource(id int) (Source, error) {
 	var source Source
 
-	repo.db.Where("id = ?", id).First(&source)
+	result := repo.db.Where("id = ?", id).First(&source)
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return Source{}, result.Error
+		}
+		return Source{}, fmt.Errorf("failed to get source: %w", result.Error)
+	}
 
-	return source
+	return source, nil
 }
 
-func (repo Repository) GetNotes(source_id int) []Note {
+func (repo Repository) GetNotes(sourceID int) ([]Note, error) {
 	var notes []Note
 
-	repo.db.Joins("JOIN sources ON notes.source_id = sources.id").Where(
-		"sources.id = ?", source_id).Find(&notes)
+	result := repo.db.Joins("JOIN sources ON notes.source_id = sources.id").
+		Where("sources.id = ?", sourceID).
+		Find(&notes)
 
-	return notes
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to get notes for source %d: %w", sourceID, result.Error)
+	}
+
+	// Note: Find() doesn't return ErrRecordNotFound for empty slices
+	// It returns an empty slice instead, which is fine
+	return notes, nil
 }
+
+var ErrNoNextNote = errors.New("No more notes to skip")
 
 func (repo Repository) GetNextNote(source_id int, skip int) (Note, error) {
 
@@ -161,8 +176,12 @@ func (repo Repository) GetNextNote(source_id int, skip int) (Note, error) {
 		Limit(1).
 		Find(&notes)
 
-	if result.Error != nil || result.RowsAffected == 0 {
+	if result.Error != nil {
 		return Note{}, result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return Note{}, ErrNoNextNote
 	}
 
 	return notes[0], nil
@@ -192,12 +211,12 @@ func (repo Repository) UpdateNote(id int, update Note) {
 
 	var note Note
 
-	repo.db.Debug().Model(&note).Where("id = ?", id).Updates(update)
+	repo.db.Model(&note).Where("id = ?", id).Updates(update)
 }
 
 func (repo Repository) ResetSource(id int) {
 
-	repo.db.Debug().Model(&Note{}).Where("source_id = ?", id).Updates(map[string]interface{}{
+	repo.db.Model(&Note{}).Where("source_id = ?", id).Updates(map[string]interface{}{
 		"next_due_date":   nil,
 		"last_reviewed":   nil,
 		"interval":        0,
