@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/amalrajan30/spacedgram/internal/highlights"
 	"gorm.io/gorm"
@@ -150,7 +151,7 @@ func (repo Repository) GetNotes(sourceID int) ([]Note, error) {
 	var notes []Note
 
 	result := repo.db.Joins("JOIN sources ON notes.source_id = sources.id").
-		Where("sources.id = ?", sourceID).
+		Where("(source_id = ?) AND (DATE(next_due_date) = DATE(?) OR next_due_date IS NULL)", sourceID, time.Now()).
 		Find(&notes)
 
 	if result.Error != nil {
@@ -164,15 +165,15 @@ func (repo Repository) GetNotes(sourceID int) ([]Note, error) {
 
 var ErrNoNextNote = errors.New("No more notes to skip")
 
-func (repo Repository) GetNextNote(source_id int, skip int) (Note, error) {
+func (repo Repository) GetNextNote(source_id int) (Note, error) {
 
 	var notes []Note
 
 	result := repo.db.
-		Where("source_id = ?", source_id).
+		Debug().
+		Where("id = ?", source_id).
 		Preload("Source").
 		Order("id ASC").
-		Offset(skip).
 		Limit(1).
 		Find(&notes)
 

@@ -2,7 +2,6 @@ package bot
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -146,12 +145,14 @@ func (s BotService) SelectSource(callbackData string) (storage.Source, error) {
 }
 
 type ReviewSession struct {
-	Source storage.Source
-	Count  int
+	Source  storage.Source
+	Count   int
+	NoteIDs []int
 }
 
 func (s BotService) StartSourceReview(sourceID int) (*ReviewSession, error) {
 	source, err := s.repo.GetSource(sourceID)
+	noteIDs := []int{}
 
 	if err != nil {
 		return nil, fmt.Errorf("getting source: %w", err)
@@ -163,13 +164,15 @@ func (s BotService) StartSourceReview(sourceID int) (*ReviewSession, error) {
 		return nil, fmt.Errorf("failed to retrieve notes for source ID %v", sourceID)
 	}
 
-	if len(notes) == 0 {
-		return nil, fmt.Errorf("no notes available for review in source ID %v", sourceID)
+
+	for _, note := range notes {
+		noteIDs = append(noteIDs, int(note.ID))
 	}
 
 	return &ReviewSession{
-		Source: source,
-		Count:  len(notes),
+		Source:  source,
+		Count:   len(notes),
+		NoteIDs: noteIDs,
 	}, nil
 
 }
@@ -181,7 +184,7 @@ type ReviewState struct {
 	TotalCount   int
 }
 
-func (s BotService) ProcessReview(sourceID int, skip int, previousResponse string) (*ReviewState, error) {
+func (s BotService) ProcessReview(notes []int, skip int, previousResponse string) (*ReviewState, error) {
 
 	if previousResponse != "start_review" {
 		if err := s.HandleReviewResponse(previousResponse); err != nil {
@@ -189,15 +192,18 @@ func (s BotService) ProcessReview(sourceID int, skip int, previousResponse strin
 		}
 	}
 
-	note, err := s.repo.GetNextNote(sourceID, skip)
+	if skip >= len(notes) {
+		return &ReviewState{
+			IsComplete:   true,
+			CurrentCount: skip,
+			TotalCount:   skip,
+		}, nil
+	}
+
+	noteID := notes[skip]
+
+	note, err := s.repo.GetNextNote(noteID)
 	if err != nil {
-		if errors.Is(err, storage.ErrNoNextNote) {
-			return &ReviewState{
-				IsComplete:   true,
-				CurrentCount: skip,
-				TotalCount:   skip,
-			}, nil
-		}
 		return nil, fmt.Errorf("getting next note: %w", err)
 	}
 

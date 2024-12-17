@@ -18,6 +18,7 @@ type BotHandler struct {
 
 	rwMux    sync.RWMutex
 	userData map[string]int
+	notes    []int
 }
 
 func (handler *BotHandler) setUserData(key string, val int) {
@@ -256,6 +257,7 @@ func (h *BotHandler) HandleStartReview(b *gotgbot.Bot, ctx *ext.Context) error {
 
 	h.setUserData("notes_count", session.Count)
 	h.setUserData("skip", 0)
+	h.notes = session.NoteIDs
 
 	h.HandleReviews(b, ctx)
 
@@ -283,19 +285,7 @@ func (h *BotHandler) HandleReviews(b *gotgbot.Bot, ctx *ext.Context) error {
 		return h.editMessage(b, cb.Message, "Got invalid response", nil)
 	}
 
-	// if skip >= notes_count {
-	// 	log.Printf("Review completed for: %v", sourceID)
-	// 	_, _, msgErr := cb.Message.EditText(b, "Review complete",
-	// 		&gotgbot.EditMessageTextOpts{
-	// 			ParseMode: "HTML",
-	// 		})
-	// 	if msgErr != nil {
-	// 		return fmt.Errorf("failed to edit message: %w", err)
-	// 	}
-	// 	return nil
-	// }
-
-	state, err := h.service.ProcessReview(sourceID, skip, data)
+	state, err := h.service.ProcessReview(h.notes, skip, data)
 
 	if err != nil {
 		log.Printf("Error processing review: %v", err)
