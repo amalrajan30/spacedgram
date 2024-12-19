@@ -151,7 +151,7 @@ func (repo Repository) GetNotes(sourceID int) ([]Note, error) {
 	var notes []Note
 
 	result := repo.db.Joins("JOIN sources ON notes.source_id = sources.id").
-		Where("(source_id = ?) AND (DATE(next_due_date) = DATE(?) OR next_due_date IS NULL)", sourceID, time.Now()).
+		Where("(source_id = ?) AND (DATE(next_due_date) <= DATE(?) OR next_due_date IS NULL)", sourceID, time.Now()).
 		Find(&notes)
 
 	if result.Error != nil {
@@ -224,4 +224,19 @@ func (repo Repository) ResetSource(id int) {
 		"easiness_factor": nil,
 		"review_count":    0,
 	})
+}
+
+func (repo Repository) GetPendingReviewNotes() ([]Note, error) {
+	var notes []Note
+
+	result := repo.db.
+		Joins("JOIN sources ON notes.source_id = sources.id").
+		Where("DATE(next_due_date) <= DATE(?)", time.Now()).
+		Find(&notes)
+
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to get notes in cron: %w", result.Error)
+	}
+
+	return notes, nil
 }

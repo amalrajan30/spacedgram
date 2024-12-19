@@ -276,14 +276,15 @@ func (h *BotHandler) HandleReviews(b *gotgbot.Bot, ctx *ext.Context) error {
 		return fmt.Errorf("Failed to answer callback query: %v", err)
 	}
 
-	sourceID, sourceNotFound := h.getUserData("source_id")
 	skip, skipNotFound := h.getUserData("skip")
 	// notes_count, not_found := h.getUserData("notes_count")
 
-	if !sourceNotFound || !skipNotFound {
-		log.Printf("Not found hit: %v, %v", sourceID, skip)
+	if !skipNotFound {
+		log.Printf("Not found hit: %v, %v", skip)
 		return h.editMessage(b, cb.Message, "Got invalid response", nil)
 	}
+
+	fmt.Printf("Notes : %v \n", h.notes)
 
 	state, err := h.service.ProcessReview(h.notes, skip, data)
 
@@ -293,7 +294,7 @@ func (h *BotHandler) HandleReviews(b *gotgbot.Bot, ctx *ext.Context) error {
 	}
 
 	if state.IsComplete {
-		log.Printf("Review completed for: %v", sourceID)
+		log.Printf("Review completed")
 		return h.editMessage(b, cb.Message, "Review complete", nil)
 	}
 
@@ -345,5 +346,43 @@ func (handler *BotHandler) HandleReviewReset(b *gotgbot.Bot, ctx *ext.Context) e
 	if msgErr != nil {
 		return fmt.Errorf("failed to edit message: %w", msgErr)
 	}
+	return nil
+}
+
+func (h *BotHandler) StartReviewScheduled(b *gotgbot.Bot, ctx *ext.Context) error {
+	cb := ctx.Update.CallbackQuery
+
+	_, err := cb.Answer(b, &gotgbot.AnswerCallbackQueryOpts{
+		Text: "Processing",
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to answer callback query: %w", err)
+	}
+
+	session, err := h.service.ScheduledReview()
+
+	if err != nil {
+		log.Printf("Failed to start review: %v", err)
+		return h.editMessage(b, cb.Message, "Failed to start review", nil)
+	}
+
+	if session.Count == 0 {
+		log.Printf("No notes to review today")
+		return h.editMessage(b, cb.Message, "No Notes left to review today!", nil)
+	}
+
+	if err := h.editMessage(b, cb.Message, fmt.Sprintf(
+		"Total review for today: %v",
+		session.Count,
+	), nil); err != nil {
+		return fmt.Errorf("editing message: %w", err)
+	}
+
+	h.setUserData("notes_count", session.Count)
+	h.setUserData("skip", 0)
+	h.notes = session.NoteIDs
+
+	h.HandleReviews(b, ctx)
 	return nil
 }

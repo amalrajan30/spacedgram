@@ -164,7 +164,6 @@ func (s BotService) StartSourceReview(sourceID int) (*ReviewSession, error) {
 		return nil, fmt.Errorf("failed to retrieve notes for source ID %v", sourceID)
 	}
 
-
 	for _, note := range notes {
 		noteIDs = append(noteIDs, int(note.ID))
 	}
@@ -186,7 +185,7 @@ type ReviewState struct {
 
 func (s BotService) ProcessReview(notes []int, skip int, previousResponse string) (*ReviewState, error) {
 
-	if previousResponse != "start_review" {
+	if previousResponse != "start_review" && previousResponse != "start_review_schedule" {
 		if err := s.HandleReviewResponse(previousResponse); err != nil {
 			return nil, fmt.Errorf("handling review response: %w", err)
 		}
@@ -252,4 +251,28 @@ func (service BotService) HandleReviewResponse(callbackData string) error {
 func (service BotService) HandleReset(source int) {
 
 	service.repo.ResetSource(source)
+}
+
+type ScheduledReviews struct {
+	Count   int
+	NoteIDs []int
+}
+
+func (s BotService) ScheduledReview() (*ScheduledReviews, error) {
+	notes, err := s.repo.GetPendingReviewNotes()
+	noteIDs := []int{}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get notes: %w", err)
+
+	}
+
+	for _, note := range notes {
+		noteIDs = append(noteIDs, int(note.ID))
+	}
+
+	return &ScheduledReviews{
+		Count:   len(notes),
+		NoteIDs: noteIDs,
+	}, nil
 }

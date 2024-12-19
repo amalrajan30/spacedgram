@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/amalrajan30/spacedgram/internal/bot"
+	"github.com/amalrajan30/spacedgram/internal/scheduler"
 	"github.com/amalrajan30/spacedgram/internal/storage"
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
@@ -16,6 +17,7 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/callbackquery"
+	"github.com/robfig/cron/v3"
 )
 
 func main() {
@@ -52,6 +54,11 @@ func main() {
 		panic("Failed to create new bot: " + err.Error())
 	}
 
+	c := cron.New()
+
+	scheduler := scheduler.NewScheduler(*b)
+
+	c.AddFunc("0 20 * * *", scheduler.RunScheduled)
 	repository := storage.NewRepository(db)
 	botService := bot.NewBotService(repository)
 
@@ -72,6 +79,7 @@ func main() {
 	dispatcher.AddHandler(handlers.NewCommand("startreview", botHandler.StartReviewing))
 	dispatcher.AddHandler(handlers.NewCallback(callbackquery.Equal("reset"), botHandler.HandleReviewReset))
 	dispatcher.AddHandler(handlers.NewCallback(callbackquery.Equal("start_review"), botHandler.HandleStartReview))
+	dispatcher.AddHandler(handlers.NewCallback(callbackquery.Equal("start_review_schedule"), botHandler.StartReviewScheduled))
 	dispatcher.AddHandler(handlers.NewCallback(callbackquery.Prefix("review"), botHandler.HandleReviews))
 	dispatcher.AddHandler(handlers.NewCallback(callbackquery.All, botHandler.HandleSelectSourceCallback))
 
@@ -92,6 +100,8 @@ func main() {
 	log.Printf("%s has been started...\n", b.User.Username)
 	// Idle, to keep updates coming in, and avoid bot stopping.
 	defer updater.Idle()
+
+	c.Start()
 
 	// defer highlights.UploadHandler()
 }
