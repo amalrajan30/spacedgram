@@ -22,14 +22,14 @@ type BotHandler struct {
 	notes    []int
 }
 
-func checkUser(ctx *ext.Context) bool {
+func checkUser(from int64) bool {
 	userId, err := strconv.Atoi(os.Getenv("USER_ID"))
 
 	if err != nil {
 		return false
 	}
 
-	if ctx.Message.From.Id != int64(userId) {
+	if from != int64(userId) {
 		return false
 	}
 
@@ -109,7 +109,7 @@ func (h *BotHandler) buildReviewKeyboard(noteID int64) gotgbot.InlineKeyboardMar
 
 func (handler *BotHandler) ListTopics(b *gotgbot.Bot, ctx *ext.Context) error {
 
-	if !checkUser(ctx) {
+	if !checkUser(ctx.Message.From.Id) {
 		return nil
 	}
 
@@ -136,7 +136,7 @@ func (handler *BotHandler) ListTopics(b *gotgbot.Bot, ctx *ext.Context) error {
 
 func (handler *BotHandler) SyncNotes(b *gotgbot.Bot, ctx *ext.Context) error {
 
-	if !checkUser(ctx) {
+	if !checkUser(ctx.Message.From.Id) {
 		return nil
 	}
 
@@ -155,7 +155,7 @@ func (handler *BotHandler) SyncNotes(b *gotgbot.Bot, ctx *ext.Context) error {
 
 func (handler *BotHandler) StartReviewing(b *gotgbot.Bot, ctx *ext.Context) error {
 
-	if !checkUser(ctx) {
+	if !checkUser(ctx.Message.From.Id) {
 		return nil
 	}
 
@@ -196,7 +196,7 @@ func (handler *BotHandler) StartReviewing(b *gotgbot.Bot, ctx *ext.Context) erro
 
 func (h *BotHandler) HandleSelectSourceCallback(b *gotgbot.Bot, ctx *ext.Context) error {
 
-	if !checkUser(ctx) {
+	if !checkUser(ctx.Update.CallbackQuery.From.Id) {
 		return nil
 	}
 
@@ -253,7 +253,7 @@ func (h *BotHandler) HandleSelectSourceCallback(b *gotgbot.Bot, ctx *ext.Context
 
 func (h *BotHandler) HandleStartReview(b *gotgbot.Bot, ctx *ext.Context) error {
 
-	if !checkUser(ctx) {
+	if !checkUser(ctx.Update.CallbackQuery.From.Id) {
 		return nil
 	}
 
@@ -304,7 +304,7 @@ func (h *BotHandler) HandleStartReview(b *gotgbot.Bot, ctx *ext.Context) error {
 
 func (h *BotHandler) HandleReviews(b *gotgbot.Bot, ctx *ext.Context) error {
 
-	if !checkUser(ctx) {
+	if !checkUser(ctx.Update.CallbackQuery.From.Id) {
 		return nil
 	}
 
@@ -362,7 +362,7 @@ func (h *BotHandler) HandleReviews(b *gotgbot.Bot, ctx *ext.Context) error {
 
 func (handler *BotHandler) HandleReviewReset(b *gotgbot.Bot, ctx *ext.Context) error {
 
-	if !checkUser(ctx) {
+	if !checkUser(ctx.Update.CallbackQuery.From.Id) {
 		return nil
 	}
 
@@ -399,7 +399,7 @@ func (handler *BotHandler) HandleReviewReset(b *gotgbot.Bot, ctx *ext.Context) e
 
 func (h *BotHandler) StartReviewScheduled(b *gotgbot.Bot, ctx *ext.Context) error {
 
-	if !checkUser(ctx) {
+	if !checkUser(ctx.Update.CallbackQuery.From.Id) {
 		return nil
 	}
 
