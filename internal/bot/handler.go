@@ -239,8 +239,12 @@ func (h *BotHandler) HandleSelectSourceCallback(b *gotgbot.Bot, ctx *ext.Context
 	}
 
 	if err := h.editMessage(b, cb.Message, fmt.Sprintf(
-		"Selected book: %s\nNo of notes: %v",
-		source.Title, source.TotalNotes,
+		"📚 <b>Selected Book</b>\n"+
+			"━━━━━━━━━━━━━━\n"+
+			"<b>Title:</b> %s\n"+
+			"<b>Notes:</b> %v",
+		source.Title,
+		source.TotalNotes,
 	), &gotgbot.EditMessageTextOpts{
 		ReplyMarkup: keyboard,
 		ParseMode:   "HTML",
@@ -287,8 +291,12 @@ func (h *BotHandler) HandleStartReview(b *gotgbot.Bot, ctx *ext.Context) error {
 	}
 
 	if err := h.editMessage(b, cb.Message, fmt.Sprintf(
-		"Starting review for book: %s\nNo of notes: %v",
-		session.Source.Title, session.Source.TotalNotes,
+		"📚 <b>Starting Review</b>\n"+
+			"━━━━━━━━━━━━━━\n"+
+			"<b>Book:</b> %s\n"+
+			"<b>Notes:</b> %v",
+		session.Source.Title,
+		session.Source.TotalNotes,
 	), nil); err != nil {
 		return fmt.Errorf("editing message: %w", err)
 	}
@@ -343,8 +351,13 @@ func (h *BotHandler) HandleReviews(b *gotgbot.Bot, ctx *ext.Context) error {
 
 	keyboard := h.buildReviewKeyboard(int64(state.NoteToReview.ID))
 	noteText := fmt.Sprintf(
-		"<b>%s</b> \n\n<i>%v</i>\n",
-		state.NoteToReview.Content, state.NoteToReview.Source.Title,
+		"📝 <b>Note #%v/%v</b>\n\n"+
+			"%s\n\n"+
+			"📚 <i>From:</i> %v",
+		skip+1,
+		len(h.notes),
+		state.NoteToReview.Content,
+		state.NoteToReview.Source.Title,
 	)
 
 	if keyboardErr := h.editMessage(b, cb.Message, noteText, &gotgbot.EditMessageTextOpts{
