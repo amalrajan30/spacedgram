@@ -2,6 +2,8 @@ package scheduler
 
 import (
 	"log"
+	"os"
+	"strconv"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 )
@@ -20,7 +22,12 @@ func NewScheduler(bot gotgbot.Bot) *Scheduler {
 func (s Scheduler) RunScheduled() {
 
 	log.Println("Running scheduled")
-	userID := 486005950
+	userID, userIDErr := strconv.Atoi(os.Getenv("USER_ID"))
+
+	if userIDErr != nil {
+		log.Printf("failed to load user id: %v", userIDErr)
+		return
+	}
 
 	keyboard := gotgbot.InlineKeyboardMarkup{
 		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{{

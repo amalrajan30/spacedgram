@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,6 +20,21 @@ type BotHandler struct {
 	rwMux    sync.RWMutex
 	userData map[string]int
 	notes    []int
+}
+
+func checkUser(ctx *ext.Context) bool {
+	userId, err := strconv.Atoi(os.Getenv("USER_ID"))
+
+	if err != nil {
+		return false
+	}
+
+	if ctx.Message.From.Id != int64(userId) {
+		return false
+	}
+
+	return true
+
 }
 
 func (handler *BotHandler) setUserData(key string, val int) {
@@ -93,6 +109,10 @@ func (h *BotHandler) buildReviewKeyboard(noteID int64) gotgbot.InlineKeyboardMar
 
 func (handler *BotHandler) ListTopics(b *gotgbot.Bot, ctx *ext.Context) error {
 
+	if !checkUser(ctx) {
+		return nil
+	}
+
 	fmt.Println("Got list all topic")
 
 	sources := handler.service.repo.GetSources()
@@ -116,6 +136,10 @@ func (handler *BotHandler) ListTopics(b *gotgbot.Bot, ctx *ext.Context) error {
 
 func (handler *BotHandler) SyncNotes(b *gotgbot.Bot, ctx *ext.Context) error {
 
+	if !checkUser(ctx) {
+		return nil
+	}
+
 	handler.service.SyncHighlights()
 
 	_, err := ctx.EffectiveMessage.Reply(b, "All notes synced", &gotgbot.SendMessageOpts{
@@ -130,6 +154,10 @@ func (handler *BotHandler) SyncNotes(b *gotgbot.Bot, ctx *ext.Context) error {
 }
 
 func (handler *BotHandler) StartReviewing(b *gotgbot.Bot, ctx *ext.Context) error {
+
+	if !checkUser(ctx) {
+		return nil
+	}
 
 	sources := handler.service.repo.GetSources()
 
@@ -167,6 +195,11 @@ func (handler *BotHandler) StartReviewing(b *gotgbot.Bot, ctx *ext.Context) erro
 }
 
 func (h *BotHandler) HandleSelectSourceCallback(b *gotgbot.Bot, ctx *ext.Context) error {
+
+	if !checkUser(ctx) {
+		return nil
+	}
+
 	bookID := ctx.CallbackQuery.Data
 	cb := ctx.Update.CallbackQuery
 
@@ -219,6 +252,11 @@ func (h *BotHandler) HandleSelectSourceCallback(b *gotgbot.Bot, ctx *ext.Context
 }
 
 func (h *BotHandler) HandleStartReview(b *gotgbot.Bot, ctx *ext.Context) error {
+
+	if !checkUser(ctx) {
+		return nil
+	}
+
 	cb := ctx.Update.CallbackQuery
 
 	_, err := cb.Answer(b, &gotgbot.AnswerCallbackQueryOpts{
@@ -265,6 +303,11 @@ func (h *BotHandler) HandleStartReview(b *gotgbot.Bot, ctx *ext.Context) error {
 }
 
 func (h *BotHandler) HandleReviews(b *gotgbot.Bot, ctx *ext.Context) error {
+
+	if !checkUser(ctx) {
+		return nil
+	}
+
 	cb := ctx.Update.CallbackQuery
 	data := ctx.CallbackQuery.Data
 
@@ -318,6 +361,11 @@ func (h *BotHandler) HandleReviews(b *gotgbot.Bot, ctx *ext.Context) error {
 }
 
 func (handler *BotHandler) HandleReviewReset(b *gotgbot.Bot, ctx *ext.Context) error {
+
+	if !checkUser(ctx) {
+		return nil
+	}
+
 	cb := ctx.Update.CallbackQuery
 
 	_, err := cb.Answer(b, &gotgbot.AnswerCallbackQueryOpts{
@@ -350,6 +398,11 @@ func (handler *BotHandler) HandleReviewReset(b *gotgbot.Bot, ctx *ext.Context) e
 }
 
 func (h *BotHandler) StartReviewScheduled(b *gotgbot.Bot, ctx *ext.Context) error {
+
+	if !checkUser(ctx) {
+		return nil
+	}
+
 	cb := ctx.Update.CallbackQuery
 
 	_, err := cb.Answer(b, &gotgbot.AnswerCallbackQueryOpts{
