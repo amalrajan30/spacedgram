@@ -54,7 +54,8 @@ func main() {
 		panic("Failed to create new bot: " + err.Error())
 	}
 
-	c := cron.New()
+	loc, _ := time.LoadLocation("Asia/Kolkata")
+	c := cron.New(cron.WithLocation(loc))
 
 	scheduler := scheduler.NewScheduler(*b)
 
@@ -74,14 +75,37 @@ func main() {
 
 	updater := ext.NewUpdater(dispatcher, nil)
 
-	dispatcher.AddHandler(handlers.NewCommand("list_topics", botHandler.ListTopics))
-	dispatcher.AddHandler(handlers.NewCommand("sync", botHandler.SyncNotes))
-	dispatcher.AddHandler(handlers.NewCommand("startreview", botHandler.StartReviewing))
-	dispatcher.AddHandler(handlers.NewCallback(callbackquery.Equal("reset"), botHandler.HandleReviewReset))
-	dispatcher.AddHandler(handlers.NewCallback(callbackquery.Equal("start_review"), botHandler.HandleStartReview))
-	dispatcher.AddHandler(handlers.NewCallback(callbackquery.Equal("start_review_schedule"), botHandler.StartReviewScheduled))
-	dispatcher.AddHandler(handlers.NewCallback(callbackquery.Prefix("review"), botHandler.HandleReviews))
-	dispatcher.AddHandler(handlers.NewCallback(callbackquery.All, botHandler.HandleSelectSourceCallback))
+	dispatcher.AddHandler(
+		handlers.NewCommand("list_topics", botHandler.ListTopics),
+	)
+
+	dispatcher.AddHandler(
+		handlers.NewCommand("sync", botHandler.SyncNotes),
+	)
+
+	dispatcher.AddHandler(
+		handlers.NewCommand("startreview", botHandler.StartReviewing),
+	)
+
+	dispatcher.AddHandler(
+		handlers.NewCallback(callbackquery.Equal("reset"), botHandler.HandleReviewReset),
+	)
+
+	dispatcher.AddHandler(
+		handlers.NewCallback(callbackquery.Equal("start_review"), botHandler.HandleStartReview),
+	)
+
+	dispatcher.AddHandler(
+		handlers.NewCallback(callbackquery.Equal("start_review_schedule"), botHandler.StartReviewScheduled),
+	)
+
+	dispatcher.AddHandler(
+		handlers.NewCallback(callbackquery.Prefix("review"), botHandler.HandleReviews),
+	)
+
+	dispatcher.AddHandler(
+		handlers.NewCallback(callbackquery.All, botHandler.HandleSelectSourceCallback),
+	)
 
 	err = updater.StartPolling(b, &ext.PollingOpts{
 		DropPendingUpdates: true,
