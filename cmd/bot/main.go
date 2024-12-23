@@ -92,7 +92,15 @@ func main() {
 	)
 
 	dispatcher.AddHandler(
-		handlers.NewCallback(callbackquery.Equal("start_review"), botHandler.HandleStartReview),
+		handlers.NewCallback(callbackquery.Equal("cloze_yes"), botHandler.ClozeQuestion),
+	)
+
+	dispatcher.AddHandler(
+		handlers.NewCallback(callbackquery.Equal("cloze_no"), botHandler.ClozeQuestion),
+	)
+
+	dispatcher.AddHandler(
+		handlers.NewCallback(callbackquery.Equal("start_review"), botHandler.StartReview),
 	)
 
 	dispatcher.AddHandler(

@@ -185,7 +185,9 @@ type ReviewState struct {
 
 func (s BotService) ProcessReview(notes []int, skip int, previousResponse string) (*ReviewState, error) {
 
-	if previousResponse != "start_review" && previousResponse != "start_review_schedule" {
+	fmt.Printf("Process review data: %v", previousResponse)
+
+	if previousResponse != "cloze_yes" && previousResponse != "start_review_schedule" {
 		if err := s.HandleReviewResponse(previousResponse); err != nil {
 			return nil, fmt.Errorf("handling review response: %w", err)
 		}

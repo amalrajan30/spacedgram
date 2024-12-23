@@ -255,8 +255,7 @@ func (h *BotHandler) HandleSelectSourceCallback(b *gotgbot.Bot, ctx *ext.Context
 	return nil
 }
 
-func (h *BotHandler) HandleStartReview(b *gotgbot.Bot, ctx *ext.Context) error {
-
+func (h *BotHandler) StartReview(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !checkUser(ctx.Update.CallbackQuery.From.Id) {
 		return nil
 	}
@@ -268,13 +267,58 @@ func (h *BotHandler) HandleStartReview(b *gotgbot.Bot, ctx *ext.Context) error {
 	})
 
 	if err != nil {
-		return fmt.Errorf("Failed to answer callback query: %v", err)
+		return fmt.Errorf("failed to answer callback query: %w", err)
+	}
+
+	keyboard := gotgbot.InlineKeyboardMarkup{
+		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{{
+			{
+				Text:         "Yes",
+				CallbackData: "cloze_yes",
+			},
+			{
+				Text:         "No",
+				CallbackData: "cloze_no",
+			},
+		}},
+	}
+
+	if err := h.editMessage(b, cb.Message, "Want to use cloze style questions?", &gotgbot.EditMessageTextOpts{
+		ReplyMarkup: keyboard,
+		ParseMode:   "HTML",
+	}); err != nil {
+		return fmt.Errorf("failed to edit message: %w", err)
+	}
+
+	return nil
+
+}
+
+func (h *BotHandler) ClozeQuestion(b *gotgbot.Bot, ctx *ext.Context) error {
+
+	if !checkUser(ctx.Update.CallbackQuery.From.Id) {
+		return nil
+	}
+
+	cb := ctx.Update.CallbackQuery
+	data := ctx.CallbackQuery.Data
+
+	_, err := cb.Answer(b, &gotgbot.AnswerCallbackQueryOpts{
+		Text: "Starting Review....",
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to answer callback query: %w", err)
+	}
+
+	if strings.Split(data, "_")[1] == "yes" {
+		h.setUserData("clozeDeletion", 1)
 	}
 
 	id, not_found := h.getUserData("source_id")
 
 	if not_found {
-		_, _, err = cb.Message.EditText(b, "Got invalid response", nil)
+		_, _, _ = cb.Message.EditText(b, "Got invalid response", nil)
 	}
 
 	log.Printf("Got book to start review: %v\n", id)
@@ -331,7 +375,7 @@ func (h *BotHandler) HandleReviews(b *gotgbot.Bot, ctx *ext.Context) error {
 	// notes_count, not_found := h.getUserData("notes_count")
 
 	if !skipNotFound {
-		log.Printf("Not found hit: %v, %v", skip)
+		log.Printf("Not found hit: %v", skip)
 		return h.editMessage(b, cb.Message, "Got invalid response", nil)
 	}
 
