@@ -270,6 +270,16 @@ func (h *BotHandler) StartReview(b *gotgbot.Bot, ctx *ext.Context) error {
 		return fmt.Errorf("failed to answer callback query: %w", err)
 	}
 
+	id, _ := h.getUserData("source_id")
+
+	status, err := h.service.ClozeStatus(id)
+
+	if status {
+		ctx.CallbackQuery.Data = "cloze_yes"
+		h.ClozeQuestion(b, ctx)
+	}
+
+
 	keyboard := gotgbot.InlineKeyboardMarkup{
 		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{{
 			{

@@ -187,7 +187,7 @@ func (s BotService) ProcessReview(notes []int, skip int, previousResponse string
 
 	fmt.Printf("Process review data: %v", previousResponse)
 
-	if previousResponse != "cloze_yes" && previousResponse != "start_review_schedule" {
+	if !strings.HasPrefix(previousResponse, "cloze") && previousResponse != "start_review_schedule" {
 		if err := s.HandleReviewResponse(previousResponse); err != nil {
 			return nil, fmt.Errorf("handling review response: %w", err)
 		}
@@ -277,4 +277,16 @@ func (s BotService) ScheduledReview() (*ScheduledReviews, error) {
 		Count:   len(notes),
 		NoteIDs: noteIDs,
 	}, nil
+}
+
+func (s BotService) ClozeStatus(sourceID int) (bool, error) {
+
+	source, err := s.repo.GetSource(sourceID)
+
+	if err != nil {
+		return false, fmt.Errorf("failed to get source: %w", err)
+	}
+
+	return source.ClozeQuestion, nil
+
 }
