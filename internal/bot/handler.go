@@ -279,7 +279,6 @@ func (h *BotHandler) StartReview(b *gotgbot.Bot, ctx *ext.Context) error {
 		h.ClozeQuestion(b, ctx)
 	}
 
-
 	keyboard := gotgbot.InlineKeyboardMarkup{
 		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{{
 			{
@@ -322,7 +321,9 @@ func (h *BotHandler) ClozeQuestion(b *gotgbot.Bot, ctx *ext.Context) error {
 	}
 
 	if strings.Split(data, "_")[1] == "yes" {
-		h.setUserData("clozeDeletion", 1)
+		h.setUserData("clozeQuestion", 1)
+	} else {
+		h.setUserData("clozeQuestion", 0)
 	}
 
 	id, not_found := h.getUserData("source_id")
@@ -391,7 +392,11 @@ func (h *BotHandler) HandleReviews(b *gotgbot.Bot, ctx *ext.Context) error {
 
 	fmt.Printf("Notes : %v \n", h.notes)
 
-	state, err := h.service.ProcessReview(h.notes, skip, data)
+	clazeEnabled, _ := h.getUserData("clozeQuestion")
+
+	fmt.Printf("Claze enabled: %v \n", clazeEnabled)
+
+	state, err := h.service.ProcessReview(h.notes, skip, data, clazeEnabled == 1)
 
 	if err != nil {
 		log.Printf("Error processing review: %v", err)
@@ -403,18 +408,41 @@ func (h *BotHandler) HandleReviews(b *gotgbot.Bot, ctx *ext.Context) error {
 		return h.editMessage(b, cb.Message, "Review complete", nil)
 	}
 
-	keyboard := h.buildReviewKeyboard(int64(state.NoteToReview.ID))
-	noteText := fmt.Sprintf(
-		"📝 <b>Note #%v/%v</b>\n\n"+
-			"%s\n\n"+
-			"📚 <i>From:</i> %v",
-		skip+1,
-		len(h.notes),
-		state.NoteToReview.Content,
-		state.NoteToReview.Source.Title,
-	)
+	// Delete the previous message to avoid spoiler reveal issues
+	_, err = cb.Message.Delete(b, nil)
+	if err != nil {
+		log.Printf("Error deleting previous message: %v", err)
+	}
 
-	if keyboardErr := h.editMessage(b, cb.Message, noteText, &gotgbot.EditMessageTextOpts{
+	var noteText string
+
+	if clazeEnabled == 0 {
+		noteText = fmt.Sprintf(
+			"📝 <b>Note #%v/%v</b>\n\n"+
+				"%s\n\n"+
+				"📚 <i>From:</i> %v",
+			skip+1,
+			len(h.notes),
+			state.NoteToReview.Content,
+			state.NoteToReview.Source.Title,
+		)
+	} else {
+		noteText = fmt.Sprintf(
+			"📝 <b>Note #%v/%v</b>\n\n"+
+				"Question: %s\n\n"+
+				"Answer: <span class=\"tg-spoiler\">%s</span>\n\n"+
+				"📚 <i>From:</i> %v",
+			skip+1,
+			len(h.notes),
+			state.NoteToReview.Question,
+			state.NoteToReview.Answer,
+			state.NoteToReview.Source.Title,
+		)
+	}
+
+	keyboard := h.buildReviewKeyboard(int64(state.NoteToReview.ID))
+
+	if _, keyboardErr := b.SendMessage(cb.Message.GetChat().Id, noteText, &gotgbot.SendMessageOpts{
 		ReplyMarkup: keyboard,
 		ParseMode:   "HTML",
 	}); keyboardErr != nil {

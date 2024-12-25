@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/amalrajan30/spacedgram/internal/highlights"
+	"github.com/amalrajan30/spacedgram/internal/llm"
 	"github.com/amalrajan30/spacedgram/internal/spaced"
 	"github.com/amalrajan30/spacedgram/internal/storage"
 )
@@ -183,7 +184,7 @@ type ReviewState struct {
 	TotalCount   int
 }
 
-func (s BotService) ProcessReview(notes []int, skip int, previousResponse string) (*ReviewState, error) {
+func (s BotService) ProcessReview(notes []int, skip int, previousResponse string, clazeQuestion bool) (*ReviewState, error) {
 
 	fmt.Printf("Process review data: %v", previousResponse)
 
@@ -203,13 +204,26 @@ func (s BotService) ProcessReview(notes []int, skip int, previousResponse string
 
 	noteID := notes[skip]
 
-	note, err := s.repo.GetNextNote(noteID)
+	var note *storage.Note
+
+	nextNote, err := s.repo.GetNextNote(noteID)
+	note = &nextNote
 	if err != nil {
 		return nil, fmt.Errorf("getting next note: %w", err)
 	}
 
+	if clazeQuestion {
+		clazeNote, err := s.GetClozeQuestion(note)
+
+		if err != nil {
+			return nil, fmt.Errorf("getting claze question: %w", err)
+		}
+
+		note = clazeNote
+	}
+
 	return &ReviewState{
-		NoteToReview: &note,
+		NoteToReview: note,
 		IsComplete:   false,
 		CurrentCount: skip,
 		TotalCount:   skip + 1,
@@ -288,5 +302,30 @@ func (s BotService) ClozeStatus(sourceID int) (bool, error) {
 	}
 
 	return source.ClozeQuestion, nil
+
+}
+
+func (s BotService) GetClozeQuestion(note *storage.Note) (*storage.Note, error) {
+
+	if note.Question != "" {
+		return note, nil
+	}
+
+	clazeQuestion, err := llm.GenerateClaseQuestionAnswer(note.Content)
+
+	if err != nil {
+		return nil, err
+	}
+
+	updatedNote, err := s.repo.UpdateNote(int(note.ID), storage.Note{
+		Question: clazeQuestion.Question,
+		Answer:   clazeQuestion.Answer,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return updatedNote, nil
 
 }

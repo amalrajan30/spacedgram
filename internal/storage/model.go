@@ -16,15 +16,18 @@ type Note struct {
 	Interval       int
 	ReviewCount    int
 	Location       string `gorm:"index"`
+	Question       string
+	Answer         string
 	SourceID       int
 	Source         Source
 }
 
 type Source struct {
 	gorm.Model
-	Title      string `gorm:"index"`
-	Origin     string
-	TotalNotes int
+	Title         string `gorm:"index"`
+	Origin        string
+	TotalNotes    int
+	ClozeQuestion bool
 }
 
 func (n *Note) AfterCreate(tx *gorm.DB) (err error) {

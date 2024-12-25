@@ -208,11 +208,25 @@ func (repo Repository) GetNote(id int) (*Note, error) {
 	return &note, nil
 }
 
-func (repo Repository) UpdateNote(id int, update Note) {
-
+func (repo Repository) UpdateNote(id int, update Note) (*Note, error) {
 	var note Note
 
-	repo.db.Model(&note).Where("id = ?", id).Updates(update)
+	result := repo.db.Model(&note).Where("id = ?", id).Updates(update)
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to update note: %w", result.Error)
+	}
+
+	// Fetch the updated record to return
+	if err := repo.db.First(&note, id).Error; err != nil {
+		return nil, fmt.Errorf("failed to fetch updated note: %w", err)
+	}
+
+	// Check if any record was actually updated
+	if result.RowsAffected == 0 {
+		return nil, fmt.Errorf("note with id %d not found", id)
+	}
+
+	return &note, nil
 }
 
 func (repo Repository) ResetSource(id int) {
